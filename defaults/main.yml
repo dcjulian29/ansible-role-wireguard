@@ -1,0 +1,17 @@
+---
+wireguard_base_dir: /etc/wireguard
+wireguard_base_net: "10.254"
+wireguard_default_ip: "{{ wireguard_base_net }}.{{ wireguard_group_number }}.{{ wireguard_private_ip }}"
+wireguard_default_port: 51820
+wireguard_enable_nat: false
+wireguard_forward_ipv4: false
+wireguard_forward_ipv6: false
+wireguard_group_number: 1
+wireguard_interfaces:
+  - name: wg0
+    address: '{{ wireguard_default_ip }}/{{ wireguard_subnet }}'
+    private_key: +FHvMJ74xFRYn3Pn7NLV5w6jNM4RafkqJdo/s0m1HU8=
+wireguard_inventory_group_name: all
+wireguard_nat_interface: eth0
+wireguard_private_ip: "{{ groups[wireguard_inventory_group_name].index(inventory_hostname) + 1 }}"
+wireguard_subnet: 24

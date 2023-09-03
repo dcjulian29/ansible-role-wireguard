@@ -1,0 +1,85 @@
+---
+- name: For Debian-based systems, update APT cache
+  ansible.builtin.apt:
+    update_cache: true
+  when: ansible_os_family | lower == 'debian'
+
+- name: Install WireGuard Kernel module for RHEL less than 9.x
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - elrepo-release
+    - epel-release
+    - kmod-wireguard
+  when:
+    - ansible_os_family | lower == 'redhat'
+    - ansible_distribution_major_version | int < 9
+
+- name: Ensure WireGuard packages are installed
+  ansible.builtin.package:
+    name: wireguard-tools
+    state: present
+
+- name: Ensure WireGuard configuration directory is present
+  ansible.builtin.file:
+    dest: /etc/wireguard
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure WireGuard interface configurations are present and configured
+  ansible.builtin.template:
+    src: 'wg.conf.j2'
+    dest: "{{ wireguard_base_dir }}/{{ wg_conf['name'] }}.conf"
+    mode: "0600"
+    owner: root
+    group: root
+  loop: "{{ wireguard_interfaces }}"
+  loop_control:
+    loop_var: wg_conf
+
+- name: Ensure WireGuard interfaces are enabled at boot.
+  ansible.builtin.service:
+    name: "wg-quick@{{ wg_conf['name'] }}"
+    enabled: true
+  loop: "{{ wireguard_interfaces }}"
+  loop_control:
+    loop_var: "wg_conf"
+
+- name: Enable IPv4 forwarding if needed
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+    reload: true
+    state: present
+  when: wireguard_forward_ipv4
+
+- name: Enable IPv6 forwarding if needed
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: 1
+    reload: true
+    state: present
+  when:
+    - wireguard_forward_ipv6
+    - ansible_default_ipv6 | length > 0
+
+- name: Ensure WireGuard waits long enough to allow proper DNS resolution
+  community.general.ini_file:
+    path: /lib/systemd/system/wg-quick@.service
+    section: Unit
+    option: After
+    value: multi-user.target
+    state: present
+    no_extra_spaces: true
+    create: false
+
+- name: Restart WireGuard interfaces to ensure interface configuration are applied
+  ansible.builtin.service:
+    name: "wg-quick@{{ wg_conf['name'] }}"
+    state: restarted
+  loop: "{{ wireguard_interfaces }}"
+  loop_control:
+    loop_var: "wg_conf"

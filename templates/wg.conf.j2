@@ -1,0 +1,59 @@
+[Interface]
+Address = {{ wg_conf['address'] }}
+ListenPort = {{ wg_conf['listen_port'] if wg_conf['listen_port'] is defined else wireguard_default_port }}
+PrivateKey = {{ wg_conf['private_key'] }}
+{% if wg_conf['dns'] is defined %}
+DNS = {{ wg_conf['dns'] }}
+{% endif %}
+{% if wg_conf['fwmark'] is defined %}
+FwMark = {{ wg_conf['fwmark'] }}
+{% endif %}
+{% if wg_conf['mtu'] is defined %}
+MTU = {{ wg_conf['mtu'] }}
+{% endif %}
+{% if wg_conf['table'] is defined %}
+Table = {{ wg_conf['table'] }}
+{% endif %}
+
+{% if wg_conf['preup'] is defined %}
+{%   for wg_preup in wg_conf['preup'] %}
+PreUp = {{ wg_preup }}
+{%   endfor %}
+{% endif %}
+{% if wireguard_enable_nat %}
+PostUp = iptables -I FORWARD 1 -i {{ wg_conf['name'] }} -j ACCEPT; iptables -t nat -I POSTROUTING 1 -o {{ wireguard_nat_interface }} -j MASQUERADE
+{% else %}
+{%   if wg_conf['postup'] is defined %}
+{%     for wg_postup in wg_conf['postup'] %}
+PostUp = {{ wg_postup }}
+{%     endfor %}
+{%   endif %}
+{% endif %}
+{% if wg_conf['predown'] is defined %}
+{%   for wg_predown in wg_conf['predown'] %}
+PreDown = {{ wg_predown }}
+{%   endfor %}
+{% endif %}
+{% if wireguard_enable_nat %}
+PostDown = iptables -D FORWARD -i {{ wg_conf['name'] }} -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ wireguard_nat_interface }} -j MASQUERADE
+{% else %}
+{%   if wg_conf['postdown'] is defined %}
+{%     for wg_postdown in wg_conf['postdown'] %}
+PostDown = {{ wg_postdown }}
+{%     endfor %}
+{%   endif %}
+{% endif %}
+{% if wg_conf['peer'] is defined %}
+{%   for peer in wg_conf['peers'] %}
+
+[Peer]
+{%     if peer.endpoint is defined %}
+Endpoint = {{ peer.endpoint }}
+{%     endif %}
+AllowedIPs = {{ peer.allowed_ips if peer.allowed_ips is defined else '0.0.0.0/0' }}
+PublicKey = {{ peer.public_key }}
+{%     if peer.psk is defined %}
+PresharedKey = {{ peer.psk }}
+{%     endif %}
+{%   endfor %}
+{% endif %}
